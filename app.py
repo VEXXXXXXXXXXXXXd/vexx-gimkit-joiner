@@ -1,11 +1,9 @@
 from flask import Flask, request, render_template_string
-import requests
 import random
 import string
+from bot_joiner import join_gimkit
 
 app = Flask(__name__)
-
-GIMKIT_JOIN_URL = "https://www.gimkit.com/api/match/join"
 
 page = """
 <!DOCTYPE html>
@@ -84,7 +82,7 @@ pre {
 
     <form method="POST" action="/join">
         <input type="text" name="code" placeholder="Room Code"><br><br>
-        <input type="text" name="prefix" placeholder="Bot Name Prefix (ex: VEXXBot_)"><br><br>
+        <input type="text" name="prefix" placeholder="Bot Name Prefix"><br><br>
         <input type="number" name="count" placeholder="How Many Bots"><br><br>
         <button type="submit">JOIN BOTS</button>
     </form>
@@ -97,47 +95,22 @@ pre {
 </html>
 """
 
-def join_bot(code, name):
-    payload = {"code": str(code), "name": name}
-    try:
-        r = requests.post(GIMKIT_JOIN_URL, json=payload, timeout=10)
-        return r.status_code, r.text
-    except Exception as e:
-        return 0, f"ERROR: {e}"
-
 @app.route("/", methods=["GET"])
 def home():
     return render_template_string(page)
 
 @app.route("/join", methods=["POST"])
 def join():
-    code = request.form.get("code", "").strip()
-    prefix = request.form.get("prefix", "").strip()
-    count_raw = request.form.get("count", "0").strip()
+    code = request.form.get("code")
+    prefix = request.form.get("prefix")
+    count = int(request.form.get("count"))
 
     results = ""
 
-    if not code or not prefix or not count_raw:
-        results = "Error: Missing room code, prefix, or count."
-        return render_template_string(page, results=results)
-
-    try:
-        count = int(count_raw)
-        if count <= 0:
-            raise ValueError()
-    except ValueError:
-        results = "Error: Bot count must be a positive number."
-        return render_template_string(page, results=results)
-
     for i in range(count):
         bot_name = prefix + ''.join(random.choice(string.ascii_letters) for _ in range(5))
-        status, text = join_bot(code, bot_name)
-
-        short_text = text.replace("\n", " ")
-        if len(short_text) > 200:
-            short_text = short_text[:200] + "..."
-
-        results += f"{bot_name} → status={status} | {short_text}\n"
+        ok, msg = join_gimkit(code, bot_name)
+        results += f"{bot_name} → {msg}\n"
 
     return render_template_string(page, results=results)
 
